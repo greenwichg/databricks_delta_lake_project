@@ -1,0 +1,68 @@
+{
+    "cluster_configs": {
+        "streaming_cluster": {
+            "cluster_name": "customer-360-streaming",
+            "spark_version": "14.3.x-scala2.12",
+            "node_type_id": "i3.xlarge",
+            "num_workers": 4,
+            "autoscale": {
+                "min_workers": 2,
+                "max_workers": 8
+            },
+            "runtime_engine": "PHOTON",
+            "spark_conf": {
+                "spark.databricks.delta.optimizeWrite.enabled": "true",
+                "spark.databricks.delta.autoCompact.enabled": "true",
+                "spark.databricks.streaming.forEachBatch.optimized.enabled": "true",
+                "spark.sql.shuffle.partitions": "auto",
+                "spark.databricks.photon.enabled": "true"
+            },
+            "spark_env_vars": {
+                "PIPELINE_ENV": "production"
+            },
+            "custom_tags": {
+                "project": "customer-360",
+                "team": "data-engineering",
+                "cost_center": "analytics"
+            }
+        },
+        "batch_cluster": {
+            "cluster_name": "customer-360-batch",
+            "spark_version": "14.3.x-scala2.12",
+            "node_type_id": "m5d.2xlarge",
+            "num_workers": 8,
+            "autoscale": {
+                "min_workers": 4,
+                "max_workers": 16
+            },
+            "runtime_engine": "PHOTON",
+            "spark_conf": {
+                "spark.databricks.delta.optimizeWrite.enabled": "true",
+                "spark.databricks.delta.autoCompact.enabled": "true",
+                "spark.sql.adaptive.enabled": "true",
+                "spark.sql.adaptive.coalescePartitions.enabled": "true",
+                "spark.databricks.photon.enabled": "true"
+            }
+        },
+        "dlt_pipeline_cluster": {
+            "label": "default",
+            "node_type_id": "i3.xlarge",
+            "autoscale": {
+                "min_workers": 1,
+                "max_workers": 5,
+                "mode": "ENHANCED"
+            },
+            "runtime_engine": "PHOTON"
+        }
+    },
+    "photon_notes": {
+        "description": "Photon is Databricks' native vectorized query engine written in C++",
+        "benefits": [
+            "Up to 3x faster for SQL and DataFrame operations",
+            "Automatic - no code changes needed",
+            "Best for: scans, aggregations, joins, window functions",
+            "Enabled via runtime_engine: PHOTON in cluster config"
+        ],
+        "when_to_use": "Always enable for production workloads. Cost increase is offset by faster execution."
+    }
+}

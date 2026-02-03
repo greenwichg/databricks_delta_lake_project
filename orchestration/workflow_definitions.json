@@ -1,0 +1,214 @@
+{
+    "jobs": [
+        {
+            "name": "customer_360_daily_batch",
+            "description": "Daily batch pipeline: Ingest -> Transform -> Aggregate -> Optimize",
+            "tags": {
+                "project": "customer-360",
+                "team": "data-engineering",
+                "environment": "production"
+            },
+            "schedule": {
+                "quartz_cron_expression": "0 0 6 * * ?",
+                "timezone_id": "America/New_York",
+                "pause_status": "UNPAUSED"
+            },
+            "email_notifications": {
+                "on_failure": ["data-engineering@company.com"],
+                "on_success": [],
+                "no_alert_for_skipped_runs": true
+            },
+            "max_concurrent_runs": 1,
+            "timeout_seconds": 14400,
+            "tasks": [
+                {
+                    "task_key": "ingest_crm_customers",
+                    "description": "Ingest CRM customer data via Auto Loader",
+                    "notebook_task": {
+                        "notebook_path": "/Repos/data-engineering/customer-360/src/bronze/ingest_crm_customers"
+                    },
+                    "timeout_seconds": 1800,
+                    "retry_policy": {
+                        "max_retries": 2,
+                        "min_retry_interval_millis": 60000,
+                        "retry_on_timeout": true
+                    },
+                    "existing_cluster_id": "${cluster_id}"
+                },
+                {
+                    "task_key": "ingest_transactions",
+                    "description": "Ingest e-commerce transactions via Auto Loader",
+                    "notebook_task": {
+                        "notebook_path": "/Repos/data-engineering/customer-360/src/bronze/ingest_transactions"
+                    },
+                    "timeout_seconds": 1800,
+                    "retry_policy": {
+                        "max_retries": 2,
+                        "min_retry_interval_millis": 60000,
+                        "retry_on_timeout": true
+                    },
+                    "existing_cluster_id": "${cluster_id}"
+                },
+                {
+                    "task_key": "ingest_clickstream",
+                    "description": "Ingest clickstream data via Auto Loader",
+                    "notebook_task": {
+                        "notebook_path": "/Repos/data-engineering/customer-360/src/bronze/ingest_clickstream"
+                    },
+                    "timeout_seconds": 1800,
+                    "retry_policy": {
+                        "max_retries": 2,
+                        "min_retry_interval_millis": 60000,
+                        "retry_on_timeout": true
+                    },
+                    "existing_cluster_id": "${cluster_id}"
+                },
+                {
+                    "task_key": "ingest_support_tickets",
+                    "description": "Ingest support tickets via CDC",
+                    "notebook_task": {
+                        "notebook_path": "/Repos/data-engineering/customer-360/src/bronze/ingest_support_tickets"
+                    },
+                    "timeout_seconds": 1800,
+                    "retry_policy": {
+                        "max_retries": 2,
+                        "min_retry_interval_millis": 60000,
+                        "retry_on_timeout": true
+                    },
+                    "existing_cluster_id": "${cluster_id}"
+                },
+                {
+                    "task_key": "transform_customers",
+                    "description": "Silver: Clean and MERGE customers",
+                    "depends_on": [{"task_key": "ingest_crm_customers"}],
+                    "notebook_task": {
+                        "notebook_path": "/Repos/data-engineering/customer-360/src/silver/transform_customers"
+                    },
+                    "timeout_seconds": 3600,
+                    "retry_policy": {"max_retries": 1},
+                    "existing_cluster_id": "${cluster_id}"
+                },
+                {
+                    "task_key": "transform_transactions",
+                    "description": "Silver: Clean and deduplicate transactions",
+                    "depends_on": [{"task_key": "ingest_transactions"}],
+                    "notebook_task": {
+                        "notebook_path": "/Repos/data-engineering/customer-360/src/silver/transform_transactions"
+                    },
+                    "timeout_seconds": 3600,
+                    "retry_policy": {"max_retries": 1},
+                    "existing_cluster_id": "${cluster_id}"
+                },
+                {
+                    "task_key": "transform_clickstream",
+                    "description": "Silver: Sessionize clickstream events",
+                    "depends_on": [{"task_key": "ingest_clickstream"}],
+                    "notebook_task": {
+                        "notebook_path": "/Repos/data-engineering/customer-360/src/silver/transform_clickstream"
+                    },
+                    "timeout_seconds": 3600,
+                    "retry_policy": {"max_retries": 1},
+                    "existing_cluster_id": "${cluster_id}"
+                },
+                {
+                    "task_key": "transform_support_tickets",
+                    "description": "Silver: Apply CDC changes for support tickets",
+                    "depends_on": [{"task_key": "ingest_support_tickets"}],
+                    "notebook_task": {
+                        "notebook_path": "/Repos/data-engineering/customer-360/src/silver/transform_support_tickets"
+                    },
+                    "timeout_seconds": 3600,
+                    "retry_policy": {"max_retries": 1},
+                    "existing_cluster_id": "${cluster_id}"
+                },
+                {
+                    "task_key": "build_customer_360",
+                    "description": "Gold: Build unified Customer 360 view",
+                    "depends_on": [
+                        {"task_key": "transform_customers"},
+                        {"task_key": "transform_transactions"},
+                        {"task_key": "transform_clickstream"},
+                        {"task_key": "transform_support_tickets"}
+                    ],
+                    "notebook_task": {
+                        "notebook_path": "/Repos/data-engineering/customer-360/src/gold/customer_360_view"
+                    },
+                    "timeout_seconds": 3600,
+                    "retry_policy": {"max_retries": 1},
+                    "existing_cluster_id": "${cluster_id}"
+                },
+                {
+                    "task_key": "build_revenue_analytics",
+                    "description": "Gold: Build revenue analytics",
+                    "depends_on": [{"task_key": "build_customer_360"}],
+                    "notebook_task": {
+                        "notebook_path": "/Repos/data-engineering/customer-360/src/gold/revenue_analytics"
+                    },
+                    "timeout_seconds": 3600,
+                    "existing_cluster_id": "${cluster_id}"
+                },
+                {
+                    "task_key": "build_segmentation",
+                    "description": "Gold: Build customer segments",
+                    "depends_on": [{"task_key": "build_customer_360"}],
+                    "notebook_task": {
+                        "notebook_path": "/Repos/data-engineering/customer-360/src/gold/customer_segmentation"
+                    },
+                    "timeout_seconds": 3600,
+                    "existing_cluster_id": "${cluster_id}"
+                },
+                {
+                    "task_key": "optimize_tables",
+                    "description": "Run OPTIMIZE + Z-ORDER on all tables",
+                    "depends_on": [
+                        {"task_key": "build_revenue_analytics"},
+                        {"task_key": "build_segmentation"}
+                    ],
+                    "notebook_task": {
+                        "notebook_path": "/Repos/data-engineering/customer-360/src/utils/performance_optimization"
+                    },
+                    "timeout_seconds": 7200,
+                    "existing_cluster_id": "${cluster_id}"
+                },
+                {
+                    "task_key": "quality_checks",
+                    "description": "Run data quality validation",
+                    "depends_on": [{"task_key": "optimize_tables"}],
+                    "notebook_task": {
+                        "notebook_path": "/Repos/data-engineering/customer-360/src/quality/quality_monitoring"
+                    },
+                    "timeout_seconds": 1800,
+                    "existing_cluster_id": "${cluster_id}"
+                }
+            ]
+        },
+        {
+            "name": "customer_360_dlt_pipeline",
+            "description": "DLT pipeline for end-to-end Customer 360 (alternative to notebook-based orchestration)",
+            "tags": {
+                "project": "customer-360",
+                "pipeline_type": "dlt"
+            },
+            "tasks": [
+                {
+                    "task_key": "run_dlt_pipeline",
+                    "pipeline_task": {
+                        "pipeline_id": "${dlt_pipeline_id}",
+                        "full_refresh": false
+                    }
+                }
+            ],
+            "schedule": {
+                "quartz_cron_expression": "0 0 */4 * * ?",
+                "timezone_id": "America/New_York"
+            }
+        }
+    ],
+    "notes": {
+        "retry_policy": "Each Bronze task retries 2x (source may be temporarily unavailable). Silver/Gold retry 1x.",
+        "timeouts": "Bronze: 30min, Silver: 1hr, Gold: 1hr, Optimize: 2hr",
+        "scheduling": "Daily at 6am ET for batch. DLT runs every 4 hours.",
+        "monitoring": "Failed tasks send email. Use Databricks SQL dashboard for ongoing monitoring.",
+        "repair": "If a task fails, use 'Repair Run' in the UI to re-run only the failed task and its dependents."
+    }
+}
