@@ -51,6 +51,51 @@ GOLD_CHURN_FEATURES = f"{CATALOG}.{GOLD_SCHEMA}.churn_features"
 # Quality tables
 QUARANTINE_TABLE = f"{CATALOG}.{QUALITY_SCHEMA}.quarantine_records"
 QUALITY_METRICS = f"{CATALOG}.{QUALITY_SCHEMA}.quality_metrics"
+GDPR_AUDIT_TABLE = f"{CATALOG}.{QUALITY_SCHEMA}.gdpr_deletion_audit"
+
+# ML / Feature Store tables
+GOLD_CHURN_PREDICTIONS = f"{CATALOG}.{GOLD_SCHEMA}.churn_predictions"
+GOLD_BEHAVIOR_FEATURES = f"{CATALOG}.{GOLD_SCHEMA}.customer_behavior_features"
+CHURN_MODEL_NAME = f"{CATALOG}.{GOLD_SCHEMA}.churn_prediction_model"
+CHURN_MODEL_FS_NAME = f"{CATALOG}.{GOLD_SCHEMA}.churn_model_fs"
+
+# ---- Delta Sharing Settings ----
+SHARE_NAME = "customer_360_analytics_share"
+SHARE_TABLES = [
+    f"{CATALOG}.{GOLD_SCHEMA}.customer_segments",
+    f"{CATALOG}.{GOLD_SCHEMA}.revenue_analytics",
+    f"{CATALOG}.{GOLD_SCHEMA}.customer_360",
+]
+
+# ---- Lakehouse Federation Connections ----
+FEDERATION_CONNECTIONS = {
+    "crm_postgresql": {
+        "type": "POSTGRESQL",
+        "host": "crm-db.company.internal",
+        "port": "5432",
+        "secret_scope": "federation_secrets",
+    },
+    "ecommerce_mysql": {
+        "type": "MYSQL",
+        "host": "ecommerce-db.company.internal",
+        "port": "3306",
+        "secret_scope": "federation_secrets",
+    },
+}
+
+# ---- Databricks SQL Settings ----
+SQL_WAREHOUSE_CONFIG = {
+    "name": "Customer 360 Analytics Warehouse",
+    "cluster_size": "Medium",
+    "min_num_clusters": 1,
+    "max_num_clusters": 4,
+    "auto_stop_mins": 30,
+    "enable_photon": True,
+}
+
+# ---- MLflow Settings ----
+MLFLOW_EXPERIMENT_NAME = "/Workspace/customer_360/experiments/churn_prediction"
+MODEL_SERVING_ENDPOINT = "customer-churn-prediction"
 
 # ---- Auto Loader Settings ----
 AUTOLOADER_SETTINGS = {

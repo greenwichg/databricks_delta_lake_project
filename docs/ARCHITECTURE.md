@@ -88,6 +88,16 @@ Schedule: Every 4 hours or continuous
 | Governance | Unity Catalog | `governance/` |
 | Security | Row-level + Column masking | `governance/access_control.py` |
 | Audit | Delta History + System Tables | `governance/lineage_and_audit.py` |
+| Data Classification | Unity Catalog Tags + PII discovery | `governance/data_classification.py` |
+| Compliance | GDPR/CCPA deletion + retention policies | `governance/compliance_policies.py` |
+| SQL Analytics | SQL Warehouses + Dashboards + Alerts | `src/databricks_sql/` |
+| Data Sharing | Delta Sharing (open protocol) | `src/delta_sharing/` |
+| Federation | Lakehouse Federation (external DBs) | `src/delta_sharing/lakehouse_federation.py` |
+| ML Tracking | MLflow experiments + model registry | `src/ml_operations/` |
+| Feature Engineering | Feature Store + online serving | `src/ml_operations/feature_store.py` |
+| Model Serving | REST API + A/B testing | `src/ml_operations/model_registry_serving.py` |
+| CI/CD Deployment | Databricks Asset Bundles (DABs) | `asset_bundles/` |
+| Local Development | Databricks Connect v2 | `src/databricks_connect/` |
 
 ## Medallion Architecture Principles
 
@@ -130,3 +140,85 @@ Schedule: Every 4 hours or continuous
 - Cross-workspace data sharing via Unity Catalog
 - System tables for billing and usage monitoring
 - Service principals for automated access
+
+## Deployment Architecture (Asset Bundles)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    CI/CD Pipeline (GitHub Actions)                │
+│                                                                  │
+│  Push to main → Validate → Deploy Staging → Test → Deploy Prod  │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │ databricks bundle deploy
+                               ▼
+┌─────────────┐    ┌─────────────────┐    ┌─────────────────────┐
+│  DEV         │    │  STAGING         │    │  PRODUCTION          │
+│  (developer  │    │  (integration    │    │  (service principal  │
+│   identity)  │    │   testing)       │    │   identity)          │
+│              │    │                  │    │                      │
+│ customer_360 │    │ customer_360     │    │ customer_360         │
+│ _dev catalog │    │ _staging catalog │    │ _prod catalog        │
+└─────────────┘    └─────────────────┘    └─────────────────────┘
+```
+
+## Data Sharing Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Lakehouse (Unity Catalog)                      │
+│                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐│
+│  │ Delta Lake    │  │ Delta Sharing │  │ Lakehouse Federation   ││
+│  │ Tables        │  │ (Outbound)    │  │ (Inbound)              ││
+│  │               │  │               │  │                        ││
+│  │ Bronze/Silver │  │ Share Gold    │  │ Query external:        ││
+│  │ /Gold layers  │  │ tables with   │  │ • PostgreSQL (CRM)     ││
+│  │               │  │ partners      │  │ • MySQL (E-commerce)   ││
+│  │               │  │               │  │ • Snowflake (DW)       ││
+│  └──────────────┘  └──────────────┘  └────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## ML Operations Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    ML Lifecycle                                   │
+│                                                                  │
+│  Feature Store ──> Experiment Tracking ──> Model Registry         │
+│  (Gold layer)      (MLflow)                (Unity Catalog)        │
+│       │                  │                       │                │
+│       ▼                  ▼                       ▼                │
+│  ┌──────────┐     ┌──────────┐           ┌──────────────┐       │
+│  │ Offline   │     │ Compare  │           │ champion/     │       │
+│  │ (Delta)   │     │ Runs     │           │ challenger    │       │
+│  │ Online    │     │ Tune     │           │ aliases       │       │
+│  │ (DynamoDB)│     │ Params   │           └──────┬───────┘       │
+│  └──────────┘     └──────────┘                  │                │
+│                                                  ▼                │
+│                                         ┌──────────────┐         │
+│                                         │Model Serving  │         │
+│                                         │REST API       │         │
+│                                         │A/B Testing    │         │
+│                                         └──────────────┘         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Governance & Compliance Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Data Governance                                │
+│                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐│
+│  │Classification │  │ Access        │  │ Compliance              ││
+│  │               │  │ Control       │  │                        ││
+│  │ • PII tags    │  │ • GRANT/REVOKE│  │ • GDPR deletion        ││
+│  │ • Sensitivity │  │ • Row-level   │  │ • CCPA opt-out         ││
+│  │ • Auto-detect │  │ • Col masking │  │ • Data retention       ││
+│  │               │  │ • Groups      │  │ • Audit trail          ││
+│  └──────────────┘  └──────────────┘  └────────────────────────┘│
+│                                                                  │
+│  System Tables: access.audit · lineage · billing                 │
+└─────────────────────────────────────────────────────────────────┘
+```
