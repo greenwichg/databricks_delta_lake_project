@@ -1,0 +1,217 @@
+# =============================================================================
+# DATABRICKS ASSET BUNDLES (DABs) - Bundle Configuration
+# =============================================================================
+# This file defines the entire project as a Databricks Asset Bundle for
+# version-controlled, CI/CD-friendly deployment of pipelines, jobs, and clusters.
+#
+# Usage:
+#   databricks bundle validate        # Validate the bundle
+#   databricks bundle deploy -t dev   # Deploy to dev target
+#   databricks bundle deploy -t prod  # Deploy to production
+#   databricks bundle run -t dev daily_batch_pipeline  # Run a specific job
+#   databricks bundle destroy -t dev  # Tear down deployed resources
+# =============================================================================
+
+bundle:
+  name: customer_360_analytics_platform
+
+# ---- Variables (shared across targets) ----
+variables:
+  catalog:
+    description: "Unity Catalog name for the project"
+    default: "customer_360_catalog"
+  warehouse_id:
+    description: "SQL Warehouse ID for Databricks SQL queries"
+  notification_email:
+    description: "Email for job failure alerts"
+    default: "data-engineering@company.com"
+
+# ---- Workspace Settings ----
+workspace:
+  root_path: /Workspace/Users/${workspace.current_user.userName}/customer_360
+
+# ---- Artifacts ----
+artifacts:
+  customer_360_wheel:
+    type: whl
+    path: ./src
+    build: python setup.py bdist_wheel
+
+# ---- Resources: Jobs, Pipelines, Clusters ----
+resources:
+  # --- DLT Pipeline: Bronze to Gold ---
+  pipelines:
+    customer_360_dlt_pipeline:
+      name: "Customer 360 - DLT Pipeline (${bundle.target})"
+      target: "${var.catalog}"
+      development: true
+      channel: PREVIEW
+      photon: true
+      configuration:
+        catalog: "${var.catalog}"
+        bronze_schema: "bronze"
+        silver_schema: "silver"
+        gold_schema: "gold"
+      clusters:
+        - label: default
+          autoscale:
+            min_workers: 1
+            max_workers: 4
+      libraries:
+        - notebook:
+            path: ./src/dlt_pipelines/dlt_customer_360_complete.py
+      notifications:
+        - email_recipients:
+            - "${var.notification_email}"
+          alerts:
+            - on-update-failure
+            - on-flow-failure
+
+  # --- Job: Daily Batch Pipeline ---
+  jobs:
+    daily_batch_pipeline:
+      name: "Customer 360 - Daily Batch (${bundle.target})"
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"
+        timezone_id: "America/New_York"
+      email_notifications:
+        on_failure:
+          - "${var.notification_email}"
+      job_clusters:
+        - job_cluster_key: batch_cluster
+          new_cluster:
+            spark_version: "14.3.x-photon-scala2.12"
+            node_type_id: "i3.xlarge"
+            autoscale:
+              min_workers: 2
+              max_workers: 8
+            spark_conf:
+              spark.databricks.delta.optimizeWrite.enabled: "true"
+              spark.databricks.delta.autoCompact.enabled: "true"
+            data_security_mode: USER_ISOLATION
+      tasks:
+        - task_key: generate_sample_data
+          job_cluster_key: batch_cluster
+          notebook_task:
+            notebook_path: ./data_generator/generate_sample_data.py
+        - task_key: ingest_bronze
+          depends_on:
+            - task_key: generate_sample_data
+          job_cluster_key: batch_cluster
+          notebook_task:
+            notebook_path: ./src/bronze/ingest_crm_customers.py
+        - task_key: transform_silver
+          depends_on:
+            - task_key: ingest_bronze
+          job_cluster_key: batch_cluster
+          notebook_task:
+            notebook_path: ./src/silver/transform_customers.py
+        - task_key: aggregate_gold
+          depends_on:
+            - task_key: transform_silver
+          job_cluster_key: batch_cluster
+          notebook_task:
+            notebook_path: ./src/gold/customer_360_view.py
+        - task_key: optimize_tables
+          depends_on:
+            - task_key: aggregate_gold
+          job_cluster_key: batch_cluster
+          notebook_task:
+            notebook_path: ./src/utils/performance_optimization.py
+        - task_key: quality_checks
+          depends_on:
+            - task_key: aggregate_gold
+          job_cluster_key: batch_cluster
+          notebook_task:
+            notebook_path: ./src/quality/quality_monitoring.py
+
+    # --- Job: Streaming Pipeline ---
+    streaming_pipeline:
+      name: "Customer 360 - Streaming (${bundle.target})"
+      job_clusters:
+        - job_cluster_key: streaming_cluster
+          new_cluster:
+            spark_version: "14.3.x-photon-scala2.12"
+            node_type_id: "i3.xlarge"
+            num_workers: 2
+            spark_conf:
+              spark.databricks.delta.optimizeWrite.enabled: "true"
+            data_security_mode: USER_ISOLATION
+      tasks:
+        - task_key: stream_transactions
+          job_cluster_key: streaming_cluster
+          notebook_task:
+            notebook_path: ./src/streaming/stream_transactions.py
+        - task_key: stream_clickstream
+          job_cluster_key: streaming_cluster
+          notebook_task:
+            notebook_path: ./src/streaming/stream_clickstream.py
+
+    # --- Job: SQL Analytics Refresh ---
+    sql_analytics_refresh:
+      name: "Customer 360 - SQL Analytics Refresh (${bundle.target})"
+      schedule:
+        quartz_cron_expression: "0 0 7 * * ?"
+        timezone_id: "America/New_York"
+      tasks:
+        - task_key: refresh_dashboards
+          sql_task:
+            warehouse_id: "${var.warehouse_id}"
+            file:
+              path: ./src/databricks_sql/sql_queries_and_dashboards.py
+
+# ---- Targets: Dev, Staging, Production ----
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://adb-1234567890.azuredatabricks.net
+    variables:
+      catalog: "customer_360_dev"
+
+  staging:
+    workspace:
+      host: https://adb-1234567890.azuredatabricks.net
+    variables:
+      catalog: "customer_360_staging"
+    resources:
+      pipelines:
+        customer_360_dlt_pipeline:
+          development: false
+      jobs:
+        daily_batch_pipeline:
+          job_clusters:
+            - job_cluster_key: batch_cluster
+              new_cluster:
+                autoscale:
+                  min_workers: 2
+                  max_workers: 12
+
+  prod:
+    mode: production
+    workspace:
+      host: https://adb-9876543210.azuredatabricks.net
+    run_as:
+      service_principal_name: "customer-360-sp"
+    variables:
+      catalog: "customer_360_prod"
+      notification_email: "data-engineering-oncall@company.com"
+    resources:
+      pipelines:
+        customer_360_dlt_pipeline:
+          development: false
+          photon: true
+          clusters:
+            - label: default
+              autoscale:
+                min_workers: 2
+                max_workers: 16
+      jobs:
+        daily_batch_pipeline:
+          job_clusters:
+            - job_cluster_key: batch_cluster
+              new_cluster:
+                autoscale:
+                  min_workers: 4
+                  max_workers: 16
