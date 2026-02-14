@@ -6,22 +6,22 @@ A production-grade **Customer 360 Analytics Platform** built on the Databricks L
 
 ```
                         ┌─────────────────────────────────────────────────────┐
-                        │              Unity Catalog (Governance)              │
+                        │              Unity Catalog (Governance)             │
                         │   Security · Lineage · Auditing · Data Discovery    │
                         └─────────────────────────────────────────────────────┘
                                               │
-  ┌──────────────┐    ┌───────────┐    ┌──────────────┐    ┌──────────────┐
-  │ Source Systems│───>│  BRONZE   │───>│   SILVER     │───>│    GOLD      │
-  │              │    │ (Raw)     │    │ (Cleaned)    │    │ (Business)   │
-  │ • CRM (JSON) │    │           │    │              │    │              │
-  │ • Txns (CSV) │    │ Auto      │    │ Streaming +  │    │ Customer 360 │
-  │ • Clicks     │    │ Loader    │    │ CDC (MERGE)  │    │ Aggregations │
-  │   (Parquet)  │    │ Ingestion │    │ Expectations │    │ Materialized │
-  │ • Support    │    │           │    │ Schema Enf.  │    │ Views        │
-  │   (Delta CDC)│    └───────────┘    └──────────────┘    └──────────────┘
-  └──────────────┘           │                │                    │
-                             └────────────────┴────────────────────┘
-                                              │
+  ┌────────────────┐    ┌───────────┐    ┌──────────────┐    ┌──────────────┐
+  │ Source Systems │───>│  BRONZE   │───>│   SILVER     │───>│    GOLD      │
+  │                │    │ (Raw)     │    │ (Cleaned)    │    │ (Business)   │
+  │ • CRM (JSON)   │    │           │    │              │    │              │
+  │ • Txns (CSV)   │    │ Auto      │    │ Streaming +  │    │ Customer 360 │
+  │ • Clicks       │    │ Loader    │    │ CDC (MERGE)  │    │ Aggregations │
+  │   (Parquet)    │    │ Ingestion │    │ Expectations │    │ Materialized │
+  │ • Support      │    │           │    │ Schema Enf.  │    │ Views        │
+  │   (Delta CDC)  │    └───────────┘    └──────────────┘    └──────────────┘
+  └────────────────┘           │                │                    │
+                               └────────────────┴────────────────────┘
+                                                │
                         ┌─────────────────────────────────────────────────────┐
                         │         DLT / Lakeflow Declarative Pipelines        │
                         │      Orchestrated via Databricks Workflows          │
@@ -30,24 +30,24 @@ A production-grade **Customer 360 Analytics Platform** built on the Databricks L
               ┌───────────────────────────────┼───────────────────────────────┐
               ▼                               ▼                               ▼
 ┌──────────────────────┐    ┌──────────────────────┐    ┌──────────────────────┐
-│  Databricks SQL       │    │  MLflow / ML Ops      │    │  Delta Sharing       │
-│  Warehouses ·         │    │  Experiments ·         │    │  Cross-org sharing · │
-│  Dashboards · Alerts  │    │  Registry · Serving    │    │  Lakehouse Federation│
+│  Databricks SQL      │    │  MLflow / ML Ops     │    │  Delta Sharing       │
+│  Warehouses ·        │    │  Experiments ·       │    │  Cross-org sharing·  │
+│  Dashboards · Alerts │    │  Registry · Serving  │    │  Lakehouse Federation│
 └──────────────────────┘    └──────────────────────┘    └──────────────────────┘
               │                               │                               │
               └───────────────────────────────┼───────────────────────────────┘
                                               │
                         ┌─────────────────────────────────────────────────────┐
                         │             Performance Optimization                │
-                        │   OPTIMIZE · Z-ORDER · Caching · Photon Engine     │
+                        │   OPTIMIZE · Z-ORDER · Caching · Photon Engine      │
                         └─────────────────────────────────────────────────────┘
                                               │
               ┌───────────────────────────────┼───────────────────────────────┐
               ▼                               ▼                               ▼
 ┌──────────────────────┐    ┌──────────────────────┐    ┌──────────────────────┐
-│  Asset Bundles (DABs) │    │  Databricks Connect   │    │  Data Governance     │
-│  CI/CD · IaC ·        │    │  Local IDE · Remote    │    │  Classification ·    │
-│  Multi-environment    │    │  Debugging · Testing   │    │  GDPR · Compliance   │
+│  Asset Bundles (DABs)│    │  Databricks Connect  │    │  Data Governance     │
+│  CI/CD · IaC ·       │    │  Local IDE · Remote  │    │  Classification ·    │
+│  Multi-environment   │    │  Debugging · Testing │    │  GDPR · Compliance   │
 └──────────────────────┘    └──────────────────────┘    └──────────────────────┘
 ```
 
